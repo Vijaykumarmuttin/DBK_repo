@@ -18,9 +18,96 @@
 
 # COMMAND ----------
 
-FMC_base_url = "https://financialmodelingprep.com/api/v3"
-FMC_api_key = "glyLZGIF7rZJoHqHiXLfrMcjfvt1nq4J"
+base_url,api_key = get_api_key('EODH')
 
+
+# COMMAND ----------
+
+parameters = {
+    # "function":"available-exchanges",
+    "apikey":api_key
+}
+
+# COMMAND ----------
+
+API_KEY = api_key
+
+def get_exchanges(api_key):
+    """Fetches all supported global stock exchanges."""
+    url = f"https://eodhd.com/api/exchanges-list/?api_token={api_key}&fmt=json"
+    response = requests.get(url)
+    
+    if response.status_code == 200:
+        return pd.DataFrame(response.json())
+    else:
+        print("Error fetching exchanges")
+        return pd.DataFrame()
+
+# COMMAND ----------
+
+data = get_exchanges(API_KEY)
+data.head()
+
+
+# COMMAND ----------
+
+spark_data = spark.createDataFrame(data)
+
+# COMMAND ----------
+
+def get_listed_companies(exchange_code, api_key):
+    """Fetches all listed tickers for a specific exchange code."""
+    # We are adding &type=common_stock to filter out ETFs and Mutual Funds
+    url = f"https://eodhd.com/api/exchange-symbol-list/{exchange_code}?api_token={api_key}&fmt=json&type=common_stock"
+    response = requests.get(url)
+    
+    if response.status_code == 200:
+        return pd.DataFrame(response.json())
+    else:
+        print(f"Error fetching tickers for {exchange_code}")
+        return pd.DataFrame()
+
+# COMMAND ----------
+
+dtata = get_listed_companies("NEO",api_key)
+
+# COMMAND ----------
+
+spark_data_stocks_us = spark.createDataFrame(dtata)
+df = (
+    spark_data_stocks_us.withColumn("key_col",concat_ws("_",col("Code"),col("Exchange")))
+)
+
+
+# COMMAND ----------
+
+df.write.format("delta").mode("append").saveAsTable("stocks_aplha.landing.listedStocks")
+
+# COMMAND ----------
+
+display(dtata)
+
+# COMMAND ----------
+
+print(base_url+"/available-exchanges")
+
+# COMMAND ----------
+
+url = ("https://financialmodelingprep.com/stable/available-exchanges?apikey={api_key}")
+response = requests.get(url)
+data = response.json()
+display(data)
+
+# COMMAND ----------
+
+response = requests.get(base_url+"/available-exchanges",params=parameters,timeout=10)
+if response.status_code != 200:
+    raise Exception(f"Request failed with status code {response.status_code}: {response.text}")
+data = response.json()
+
+# COMMAND ----------
+
+response
 
 # COMMAND ----------
 
@@ -29,10 +116,11 @@ FMC_api_key = "glyLZGIF7rZJoHqHiXLfrMcjfvt1nq4J"
 
 # COMMAND ----------
 
-parameters = {
-    "function":"MARKET_STATUS",
-    "apikey":alpha_key
-}
+
+
+# COMMAND ----------
+
+
 
 # COMMAND ----------
 
